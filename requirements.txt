@@ -13,3 +13,4 @@ newspaper4k
 lxml_html_clean
 sqlalchemy
 chromadb
+sqlite3 >= 3.35.0
