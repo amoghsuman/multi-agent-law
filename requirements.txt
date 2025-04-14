@@ -7,3 +7,4 @@ pypdf
 requests
 sqlalchemy
 chromadb
+openai
