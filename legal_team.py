@@ -40,34 +40,27 @@ if "processed_files" not in st.session_state:
     st.session_state.processed_files = set()
 
 # Sidebar for API Config & File Upload
+# Sidebar for File Upload & Configuration
 with st.sidebar:
-
-    # Set a title for the sidebar
     st.header("Configuration")
 
-    # Add a text input to the sidebar for the API key
-    api_key = st.sidebar.text_input(
-        label="Enter your API Key:",
-        type="password",  # Masks the input for security
-        help="Your personal API key for accessing the service."
-    )
+    # Load API Key from Streamlit secrets
+    api_key = st.secrets.get("GOOGLE_API_KEY", None)
 
-    # Set API Key
     if api_key:
-        os.environ["GOOGLE_API_KEY"] = api_key # "AIzaSyAQiCbp5x7y1vhG22IabYG5XrXX50CiMQo"
-        st.success("API key entered successfully!")
-
-    # Proceed with using the API key
+        os.environ["GOOGLE_API_KEY"] = api_key
+        st.success("API key loaded from secrets!")
     else:
-        st.warning("Please enter your API key to proceed.")
-
+        st.error("Missing Google API Key in Streamlit secrets!")
 
     chunk_size_in = st.sidebar.number_input("Chunk Size", min_value=1, max_value=5000, value=1000)
     overlap_in = st.sidebar.number_input("Overlap", min_value=1, max_value=1000, value=200)
 
     st.header("📄 Document Upload")
-
     uploaded_file = st.file_uploader("Upload a Legal Document (PDF)", type=["pdf"])
+
+    chunk_size_in = st.sidebar.number_input("Chunk Size", min_value=1, max_value=5000, value=1000)
+    overlap_in = st.sidebar.number_input("Overlap", min_value=1, max_value=1000, value=200)
     
     if uploaded_file:
         if uploaded_file.name not in st.session_state.processed_files:
