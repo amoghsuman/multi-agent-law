@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "🔧 Rebuilding Python sqlite3 bindings with updated system SQLite..."
+
 PYTHON_VERSION=$(python -c "import platform; print(platform.python_version())")
 PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d '.' -f 1,2)
 
@@ -8,3 +9,9 @@ PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d '.' -f 1,2)
 pip uninstall -y sqlite3 || true
 (cd $HOME/.pythonlibs/lib/python$PYTHON_MINOR && rm -rf sqlite3*)
 python -m pip install --force-reinstall pysqlite3-binary
+
+echo "✅ sqlite3 rebuilt successfully!"
+
+# ⬇️ Force reinstall openai again to ensure it's not skipped
+echo "📦 Reinstalling openai explicitly..."
+pip install --force-reinstall openai==1.16.2
