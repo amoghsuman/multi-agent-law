@@ -22,7 +22,7 @@ from agno.document.chunking.document import DocumentChunking
 
 # Initialize Streamlit
 # Customizing the page title and header
-st.set_page_config(page_title="AI Legal Team Agents", page_icon="⚖️", layout="wide")
+#st.set_page_config(page_title="AI Legal Team Agents", page_icon="⚖️", layout="wide")
 
 # Title with emojis for visual appeal
 st.markdown("<h1 style='text-align: center; color: #3e8e41;'>👨‍⚖️ AI Legal Team Agents</h1>", unsafe_allow_html=True)
