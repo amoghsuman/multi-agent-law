@@ -1,6 +1,11 @@
 # Agents - Legal Team
-import os
 import streamlit as st
+
+# ✅ This must be the first Streamlit-related command
+st.set_page_config(page_title="AI Legal Team Agents", page_icon="⚖️", layout="wide")
+
+# Now import the rest
+import os
 import tempfile
 from agno.agent import Agent
 from agno.models.google import Gemini
