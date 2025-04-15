@@ -28,7 +28,7 @@ st.markdown("""
 
 if "vector_db" not in st.session_state:
     st.session_state.vector_db = ChromaDb(
-        collection="law", path="tmp/chromadb", persistent_client=True, embedder=GeminiEmbedder()
+        collection="law", path=None, persistent_client=False, embedder=GeminiEmbedder()
     )
 
 if "knowledge_base" not in st.session_state:
