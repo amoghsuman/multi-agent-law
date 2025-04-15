@@ -3,3 +3,4 @@ agno
 duckduckgo-search
 chromadb
 google-genai
+pypdf
