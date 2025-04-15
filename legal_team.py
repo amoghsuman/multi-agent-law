@@ -27,7 +27,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --------------------------- Session State Initialization ---------------------------
-
+#Qdrant is being used. Also check for FAISS (Faster Prototyping, ChromaDB, Pinecone etc. for different utilities.
 if "vector_db" not in st.session_state:
     # 🧠 In-memory QdrantClient setup
     client = QdrantClient(":memory:")
