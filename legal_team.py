@@ -7,8 +7,10 @@ from agno.models.google import Gemini
 from agno.embedder.google import GeminiEmbedder
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.knowledge.pdf import PDFKnowledgeBase, PDFReader
-from agno.vectordb.qdrant import QdrantInMemory  # ✅ Use QdrantInMemory
 from agno.document.chunking.document import DocumentChunking
+
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams
 
 # --------------------------- Streamlit UI Setup ---------------------------
 
@@ -27,10 +29,13 @@ st.markdown("""
 # --------------------------- Session State Initialization ---------------------------
 
 if "vector_db" not in st.session_state:
-    st.session_state.vector_db = QdrantInMemory(  # ✅ Fast and SQLite-free
-        collection="law",
-        embedder=GeminiEmbedder()
+    # 🧠 In-memory QdrantClient setup
+    client = QdrantClient(":memory:")
+    client.recreate_collection(
+        collection_name="law",
+        vectors_config=VectorParams(size=768, distance=Distance.COSINE)  # Adjust size to your embedder
     )
+    st.session_state.vector_db = client  # just for ref; not used directly in agno without wrapper
 
 if "knowledge_base" not in st.session_state:
     st.session_state.knowledge_base = None
@@ -43,9 +48,7 @@ if "processed_files" not in st.session_state:
 with st.sidebar:
     st.header("Configuration")
 
-    # Load the Google Gemini API key from Streamlit secrets
     api_key = st.secrets.get("GOOGLE_API_KEY", None)
-
     if api_key:
         os.environ["GOOGLE_API_KEY"] = api_key
         st.success("API key loaded from secrets!")
@@ -68,7 +71,7 @@ with st.sidebar:
 
                     st.session_state.knowledge_base = PDFKnowledgeBase(
                         path=temp_path,
-                        vector_db=st.session_state.vector_db,
+                        vector_db=None,  # You can plug your own wrapper here if needed
                         reader=PDFReader(),
                         chunking_strategy=DocumentChunking(chunk_size=chunk_size_in, overlap=overlap_in)
                     )
