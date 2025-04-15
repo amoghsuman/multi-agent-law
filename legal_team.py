@@ -7,17 +7,22 @@ from agno.models.google import Gemini
 from agno.embedder.google import GeminiEmbedder
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.knowledge.pdf import PDFKnowledgeBase, PDFReader
+from agno.vectordb.chroma import ChromaDb
+import sqlite3
+
+# Ensure the SQLite version is printed (debugging)
+st.write(f"SQLite version: {sqlite3.sqlite_version}")
+
 from agno.document.chunking.document import DocumentChunking
 
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams
-
-# --------------------------- Streamlit UI Setup ---------------------------
-
+# Initialize Streamlit
+# Customizing the page title and header
 st.set_page_config(page_title="AI Legal Team Agents", page_icon="⚖️", layout="wide")
 
+# Title with emojis for visual appeal
 st.markdown("<h1 style='text-align: center; color: #3e8e41;'>👨‍⚖️ AI Legal Team Agents</h1>", unsafe_allow_html=True)
 
+# Adding a short, stylish description with a bit of color
 st.markdown("""
     <div style='text-align: center; font-size: 18px; color: #4B0082;'>
         Upload your legal document and let the <b>AI LegalAdvisor</b>, <b>AI ContractsAnalyst</b>, 
@@ -26,16 +31,11 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# --------------------------- Session State Initialization ---------------------------
-#Qdrant is being used. Also check for FAISS (Faster Prototyping, ChromaDB, Pinecone etc. for different utilities.
+# Initialize session state
 if "vector_db" not in st.session_state:
-    # 🧠 In-memory QdrantClient setup
-    client = QdrantClient(":memory:")
-    client.recreate_collection(
-        collection_name="law",
-        vectors_config=VectorParams(size=768, distance=Distance.COSINE)  # Adjust size to your embedder
+    st.session_state.vector_db = ChromaDb(
+        collection="law", path="tmp/chromadb", persistent_client=True, embedder=GeminiEmbedder()
     )
-    st.session_state.vector_db = client  # just for ref; not used directly in agno without wrapper
 
 if "knowledge_base" not in st.session_state:
     st.session_state.knowledge_base = None
@@ -43,35 +43,49 @@ if "knowledge_base" not in st.session_state:
 if "processed_files" not in st.session_state:
     st.session_state.processed_files = set()
 
-# --------------------------- Sidebar Config ---------------------------
-
+# Sidebar for API Config & File Upload
 with st.sidebar:
+
+    # Set a title for the sidebar
     st.header("Configuration")
 
-    api_key = st.secrets.get("GOOGLE_API_KEY", None)
-    if api_key:
-        os.environ["GOOGLE_API_KEY"] = api_key
-        st.success("API key loaded from secrets!")
-    else:
-        st.error("Missing Google API Key in Streamlit secrets!")
+    # Add a text input to the sidebar for the API key
+    api_key = st.sidebar.text_input(
+        label="Enter your API Key:",
+        type="password",  # Masks the input for security
+        help="Your personal API key for accessing the service."
+    )
 
-    chunk_size_in = st.number_input("Chunk Size", min_value=1, max_value=5000, value=1000)
-    overlap_in = st.number_input("Overlap", min_value=1, max_value=1000, value=200)
+    # Set API Key
+    if api_key:
+        os.environ["GOOGLE_API_KEY"] = api_key 
+        st.success("API key entered successfully!")
+
+    # Proceed with using the API key
+    else:
+        st.warning("Please enter your API key to proceed.")
+
+
+    chunk_size_in = st.sidebar.number_input("Chunk Size", min_value=1, max_value=5000, value=1000)
+    overlap_in = st.sidebar.number_input("Overlap", min_value=1, max_value=1000, value=200)
 
     st.header("📄 Document Upload")
-    uploaded_file = st.file_uploader("Upload a Legal Document (PDF)", type=["pdf"])
 
+    uploaded_file = st.file_uploader("Upload a Legal Document (PDF)", type=["pdf"])
+    
     if uploaded_file:
         if uploaded_file.name not in st.session_state.processed_files:
             with st.spinner("Processing document..."):
                 try:
+                    # Save to a temp file
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
                         temp_file.write(uploaded_file.getvalue())
                         temp_path = temp_file.name
-
+                    
+                    # Process the uploaded document into knowledge base
                     st.session_state.knowledge_base = PDFKnowledgeBase(
                         path=temp_path,
-                        vector_db=None,  # You can plug your own wrapper here if needed
+                        vector_db=st.session_state.vector_db,
                         reader=PDFReader(),
                         chunking_strategy=DocumentChunking(chunk_size=chunk_size_in, overlap=overlap_in)
                     )
@@ -83,21 +97,20 @@ with st.sidebar:
 
                 except Exception as e:
                     st.error(f"Error processing document: {e}")
-
-# --------------------------- Agent Initialization ---------------------------
-
+                    
+# Initialize AI Agents (After Document Upload)
 if st.session_state.knowledge_base:
     legal_researcher = Agent(
         name="LegalAdvisor",
         model=Gemini(id="gemini-2.0-flash-exp"),
         knowledge=st.session_state.knowledge_base,
         search_knowledge=True,
-        description="Finds and cites relevant legal cases, regulations, and precedents.",
+        description="Legal Researcher AI - Finds and cites relevant legal cases, regulations, and precedents using all data in the knowledge base.",
         instructions=[
-            "Extract all available data from the knowledge base and search for legal cases, regulations, and citations.",
-            "If needed, use DuckDuckGo for additional legal references.",
-            "Always provide source references in your answers."
-        ],
+        "Extract all available data from the knowledge base and search for legal cases, regulations, and citations.",
+        "If needed, use DuckDuckGo for additional legal references.",
+        "Always provide source references in your answers."
+        ],  
         tools=[DuckDuckGoTools()],
         show_tool_calls=True,
         markdown=True
@@ -108,7 +121,7 @@ if st.session_state.knowledge_base:
         model=Gemini(id="gemini-2.0-flash-exp"),
         knowledge=st.session_state.knowledge_base,
         search_knowledge=True,
-        description="Identifies key clauses, risks, and obligations in contracts.",
+        description="Contract Analyst AI - Reviews contracts and identifies key clauses, risks, and obligations using the full document data.",
         instructions=[
             "Extract all available data from the knowledge base and analyze the contract for key clauses, obligations, and potential ambiguities.",
             "Reference specific sections of the contract where possible."
@@ -122,7 +135,7 @@ if st.session_state.knowledge_base:
         model=Gemini(id="gemini-2.0-flash-exp"),
         knowledge=st.session_state.knowledge_base,
         search_knowledge=True,
-        description="Provides strategic legal recommendations and risk assessment.",
+        description="Legal Strategist AI - Provides comprehensive risk assessment and strategic recommendations based on all the available data from the contract.",
         instructions=[
             "Using all data from the knowledge base, assess the contract for legal risks and opportunities.",
             "Provide actionable recommendations and ensure compliance with applicable laws."
@@ -134,7 +147,7 @@ if st.session_state.knowledge_base:
     team_lead = Agent(
         name="teamlead",
         model=Gemini(id="gemini-2.0-flash-exp"),
-        description="Integrates insights from all agents into a comprehensive report.",
+        description="Team Lead AI - Integrates responses from the Legal Researcher, Contract Analyst, and Legal Strategist into a comprehensive report.",
         instructions=[
             "Combine and summarize all insights provided by the Legal Researcher, Contract Analyst, and Legal Strategist. "
             "Ensure the final report includes references to all relevant sections from the document."
@@ -149,16 +162,15 @@ if st.session_state.knowledge_base:
         strategy_response = legal_strategist.run(query)
 
         final_response = team_lead.run(
-            f"Summarize and integrate the following insights:\n\n"
-            f"Legal Researcher:\n{research_response}\n\n"
-            f"Contract Analyst:\n{contract_response}\n\n"
-            f"Legal Strategist:\n{strategy_response}\n\n"
-            "Provide a structured legal analysis report that includes key terms, obligations, risks, and recommendations."
+        f"Summarize and integrate the following insights gathered using the full contract data:\n\n"
+        f"Legal Researcher:\n{research_response}\n\n"
+        f"Contract Analyst:\n{contract_response}\n\n"
+        f"Legal Strategist:\n{strategy_response}\n\n"
+        "Provide a structured legal analysis report that includes key terms, obligations, risks, and recommendations, with references to the document."
         )
         return final_response
 
-# --------------------------- Analysis Panel ---------------------------
-
+# Analysis Options
 if st.session_state.knowledge_base:
     st.header("🔍 Select Analysis Type")
     analysis_type = st.selectbox(
@@ -172,16 +184,20 @@ if st.session_state.knowledge_base:
     else:
         predefined_queries = {
             "Contract Review": (
-                "Analyze this contract using the knowledge base. Identify key terms, obligations, and risks."
+                "Analyze this document, contract, or agreement using all available data from the knowledge base. "
+                "Identify key terms, obligations, and risks in detail."
             ),
             "Legal Research": (
-                "Find relevant legal cases and precedents using the knowledge base."
+                "Using all available data from the knowledge base, find relevant legal cases and precedents related to this document, contract, or agreement. "
+                "Provide detailed references and sources."
             ),
             "Risk Assessment": (
-                "Identify potential legal risks in the document and cite specific sections."
+                "Extract all data from the knowledge base and identify potential legal risks in this document, contract, or agreement. "
+                "Detail specific risk areas and reference sections of the text."
             ),
             "Compliance Check": (
-                "Evaluate this document for compliance with legal regulations and highlight any concerns."
+                "Evaluate this document, contract, or agreement for compliance with legal regulations using all available data from the knowledge base. "
+                "Highlight any areas of concern and suggest corrective actions."
             )
         }
         query = predefined_queries[analysis_type]
@@ -193,6 +209,7 @@ if st.session_state.knowledge_base:
             with st.spinner("Analyzing..."):
                 response = get_team_response(query)
 
+                # Display results using Tabs
                 tabs = st.tabs(["Analysis", "Key Points", "Recommendations"])
 
                 with tabs[0]:
@@ -201,10 +218,14 @@ if st.session_state.knowledge_base:
 
                 with tabs[1]:
                     st.subheader("📌 Key Points Summary")
-                    summary = team_lead.run(f"Summarize the key legal points from this analysis:\n{response.content}")
-                    st.markdown(summary.content if summary.content else "No summary generated.")
+                    key_points_response = team_lead.run(
+                        f"Summarize the key legal points from this analysis:\n{response.content}"
+                    )
+                    st.markdown(key_points_response.content if key_points_response.content else "No summary generated.")
 
                 with tabs[2]:
                     st.subheader("📋 Recommendations")
-                    recommendations = team_lead.run(f"Provide legal recommendations based on this analysis:\n{response.content}")
-                    st.markdown(recommendations.content if recommendations.content else "No recommendations generated.")
+                    recommendations_response = team_lead.run(
+                        f"Provide specific legal recommendations based on this analysis:\n{response.content}"
+                    )
+                    st.markdown(recommendations_response.content if recommendations_response.content else "No recommendations generated.")
