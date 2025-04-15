@@ -7,7 +7,7 @@ from agno.models.google import Gemini
 from agno.embedder.google import GeminiEmbedder
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.knowledge.pdf import PDFKnowledgeBase, PDFReader
-from agno.vectordb.chroma import ChromaDb
+from agno.vectordb.faiss import FaissDb  # ✅ FAISS instead of Chroma
 from agno.document.chunking.document import DocumentChunking
 
 # --------------------------- Streamlit UI Setup ---------------------------
@@ -27,8 +27,9 @@ st.markdown("""
 # --------------------------- Session State Initialization ---------------------------
 
 if "vector_db" not in st.session_state:
-    st.session_state.vector_db = ChromaDb(
-        collection="law", path=None, persistent_client=False, embedder=GeminiEmbedder()
+    st.session_state.vector_db = FaissDb(  # ✅ FAISS
+        collection="law",
+        embedder=GeminiEmbedder()
     )
 
 if "knowledge_base" not in st.session_state:
@@ -42,7 +43,7 @@ if "processed_files" not in st.session_state:
 with st.sidebar:
     st.header("Configuration")
 
-    # Securely load the Google Gemini API key from Streamlit secrets
+    # Load the Google Gemini API key from Streamlit secrets
     api_key = st.secrets.get("GOOGLE_API_KEY", None)
 
     if api_key:
