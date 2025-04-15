@@ -11,7 +11,7 @@ from agno.vectordb.chroma import ChromaDb
 import sqlite3
 
 # Ensure the SQLite version is printed (debugging)
-st.write(f"SQLite version: {sqlite3.sqlite_version}")
+#st.write(f"SQLite version: {sqlite3.sqlite_version}")
 
 from agno.document.chunking.document import DocumentChunking
 
